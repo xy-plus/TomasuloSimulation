@@ -27,7 +27,7 @@ class Tomasulo {
     vector<string> nel;
     vector<Code> codes;
     vector<pair<int, ReservationStations*>> cdb;
-    string fu_writeResult[fuNum];
+    // string fu_writeResult[fuNum];
     int clock = 0;
     int current = 0;
     Register regs[32];
@@ -93,10 +93,12 @@ class Tomasulo {
     }
 
     void finish(ReservationStations* rs, int op) {
-        if (op == 1) {
+        if (op == 0) {
             fus[rs->fu] = -1;
-            fu_writeResult[rs->fu] = rs->op;
             rs->fu = FU::None;
+            return;
+        }
+        if (op == 1) {
             int line = rs->line;
             // update reg
             int regInd = codes[line].reg1;
@@ -134,6 +136,9 @@ class Tomasulo {
                 }
             }
             rs->line = -1;
+            rs->busy = false;
+            rs->remain = -1;
+            rs->op = "";
             rs->Vj = rs->Vk = rs->imm = 0;
             codeState[line].rs = nullptr;
         }
@@ -141,7 +146,7 @@ class Tomasulo {
 
     void clear_cdb() {
         for (auto info : cdb) {
-            codeState[info.first].writeResult = clock + 1;
+            codeState[info.first].writeResult = clock;
             if (logs[info.first].issue == -1) {
                 logs[info.first].issue = codeState[info.first].issue;
                 logs[info.first].execComp = codeState[info.first].execComp;
@@ -158,17 +163,21 @@ class Tomasulo {
             if (RS[i].fu != FU::None &&
                 (RS[i].op == "LD" ||
                  (RS[i].Qj == nullptr && RS[i].Qk == nullptr))) {
-                if (RS[i].state == RSState::exec) {
+                if (RS[i].remain > 0) {
                     RS[i].remain -= 1;
-                } else if (RS[i].state == RSState::waitExec) {
-                    RS[i].state = RSState::exec;
                 }
             }
-            int line = RS[i].line;
-            if (RS[i].remain <= 0 && RS[i].state == RSState::exec) {
-                cdb.push_back(make_pair(line, &RS[i]));
-                RS[i].state = RSState::execComp;
-                codeState[line].execComp = clock;
+        }
+        for (int i = 0; i < lbamNum; ++i) {
+            if (RS[i].fu != FU::None &&
+                (RS[i].op == "LD" ||
+                 (RS[i].Qj == nullptr && RS[i].Qk == nullptr))) {
+                if (RS[i].remain == 0) {
+                    int line = RS[i].line;
+                    codeState[line].execComp = clock;
+                    finish(&RS[i], 0);
+                    cdb.push_back(make_pair(line, &RS[i]));
+                }
             }
         }
     }
@@ -204,7 +213,6 @@ class Tomasulo {
 
     void assign(ReservationStations* rs, FU fu) {
         rs->fu = fu;
-        rs->state = RSState::waitExec;
         fus[fu] = rs->line;
     }
 
@@ -290,8 +298,8 @@ class Tomasulo {
         // reset rs status
         rs->busy = true;
         rs->time = clock;
-        rs->state = RSState::issue;
         rs->op = op;
+        rs->line = current;
         if (op == "LD") {
             rs->remain = time.LD;
         } else if (op == "ADD" || op == "SUB") {
@@ -301,7 +309,7 @@ class Tomasulo {
         } else if (op == "JUMP") {
             rs->remain = time.JUMP;
         }
-        rs->line = current;
+
         if (op == "LD") {  // imm
             rs->imm = codes[current].imm1;
         } else {  // Vj Vk Qj Qk
@@ -330,6 +338,12 @@ class Tomasulo {
             }
         }
 
+        FU fu = get_fu(op);
+        if (fu != FU::None &&
+            (op == "LD" || (rs->Qj == nullptr && rs->Qk == nullptr))) {
+            assign(rs, fu);
+        }
+
         if (op != "JUMP") {
             regs[codes[current].reg1].rs = rs;
             current += 1;  // calc next inst
@@ -342,7 +356,7 @@ class Tomasulo {
         }
         done = true;
         for (int i = 0; i < lbamNum; ++i) {
-            if (RS[i].busy || RS[i].state != RSState::unuse) {
+            if (RS[i].busy) {
                 done = false;
                 return;
             }
@@ -355,28 +369,28 @@ class Tomasulo {
         }
     }
 
-    void write_result() {
-        for (int i = 0; i < lbamNum; ++i) {
-            if (RS[i].state == RSState::writeResult) {
-                RS[i].state = RSState::unuse;
-                RS[i].busy = false;
-                RS[i].remain = -1;
-                RS[i].op = "";
-            } else if (RS[i].state == RSState::execComp) {
-                RS[i].state = RSState::writeResult;
-            }
-        }
-    }
+    // void write_result() {
+    //     for (int i = 0; i < lbamNum; ++i) {
+    //         if (RS[i].state == RSState::writeResult) {
+    //             RS[i].state = RSState::unuse;
+    //             RS[i].busy = false;
+    //             RS[i].remain = -1;
+    //             RS[i].op = "";
+    //         } else if (RS[i].state == RSState::execComp) {
+    //             RS[i].state = RSState::writeResult;
+    //         }
+    //     }
+    // }
 
     void step() {
         if (done)
             return;
         clock += 1;
-        issue();
-        lookup_fu();
-        update();
         clear_cdb();
-        write_result();
+        // write_result();
+        update();
+        lookup_fu();
+        issue();
         check_done();
     }
 
@@ -538,24 +552,26 @@ class Tomasulo {
         return nullptr;
     }
 
-    void print_fu() {
-        cout << "## 运算部件状态" << endl << endl;
-        cout << "| 部件名称 | 当前执行指令 | 当前还剩几个周期 |" << endl;
-        cout << "| - | - | - |" << endl;
-        for (int i = 0; i < fuNum; ++i) {
-            if (fus[i] >= 0) {
-                printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-                       codes[fus[i]].op.c_str(), fu2rs((FU)i)->remain);
-            } else if (fu_writeResult[i] != "") {
-                printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-                       fu_writeResult[i].c_str(), 0);
-                fu_writeResult[i] = "";
-            } else {
-                printf("| %s | %s | %s |\n", fu2str((FU)i).c_str(), " ", " ");
-            }
-        }
-        cout << endl;
-    }
+    // void print_fu() {
+    //     cout << "## 运算部件状态" << endl << endl;
+    //     cout << "| 部件名称 | 当前执行指令 | 当前还剩几个周期 |" << endl;
+    //     cout << "| - | - | - |" << endl;
+    //     for (int i = 0; i < fuNum; ++i) {
+    //         if (fus[i] >= 0) {
+    //             printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
+    //                    codes[fus[i]].op.c_str(), fu2rs((FU)i)->remain);
+    //         } else if (fu_writeResult[i] != "") {
+    //             printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
+    //                    fu_writeResult[i].c_str(), 0);
+    //             fu_writeResult[i] = "";
+    //         } else {
+    //             printf("| %s | %s | %s |\n", fu2str((FU)i).c_str(), " ", "
+    //             ");
+    //         }
+    //     }
+    //     cout << endl;
+    // }
+
     void print_reg() {
         cout << "## 寄存器状态" << endl << endl;
         for (int i = 0; i < 32; ++i) {

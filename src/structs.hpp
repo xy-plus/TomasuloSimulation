@@ -64,10 +64,10 @@ vector<int> argsort(const vector<T>& v) {
     return idx;
 }
 
-enum RSState { issue, waitExec, exec, execComp, writeResult, unuse };
+// enum RSState { issue, waitExec, exec, execComp, writeResult, unuse };
 
 struct ReservationStations {
-    RSState state;
+    // RSState state;
     bool busy;
     int remain;
     FU fu;
@@ -80,7 +80,7 @@ struct ReservationStations {
     int line;
 
     void clear() {
-        state = RSState::unuse;
+        // state = RSState::unuse;s
         busy = false;
         remain = -1;
         fu = FU::None;

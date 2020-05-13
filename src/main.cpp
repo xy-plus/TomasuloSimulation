@@ -15,12 +15,15 @@ int main() {
     int i = 0;
     while (!tmsl.has_done()) {
         tmsl.run(1);
-        // tmsl.print_clock();
-        // tmsl.print_amrs();
-        // tmsl.print_lb();
+        tmsl.print_clock();
+        tmsl.print_amrs();
+        tmsl.print_lb();
         // tmsl.print_reg();
         // tmsl.print_fu();
         // tmsl.print_debug();
+        if (i++ > 100) {
+            break;
+        }
     }
     tmsl.print_log();
 }
