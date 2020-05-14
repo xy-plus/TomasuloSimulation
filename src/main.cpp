@@ -8,7 +8,7 @@ using namespace std;
 
 int main() {
     Tomasulo tmsl;
-    ifstream t("./TestCase/Gcd.nel");
+    ifstream t("./TestCase/1.basic.nel");
     string nel((std::istreambuf_iterator<char>(t)),
                std::istreambuf_iterator<char>());
     tmsl.set_nel(nel);
@@ -19,7 +19,6 @@ int main() {
         // tmsl.print_lb();
         // tmsl.print_reg();
         // tmsl.print_fu();
-        // tmsl.print_reg();
     }
     tmsl.print_log();
     return 0;

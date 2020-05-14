@@ -17,14 +17,10 @@ struct Code {
     Code() { clear(); }
 };
 
-enum FU { Load1, Load2, Add1, Add2, Add3, Mult1, Mult2, None };
+enum FU { Add1, Add2, Add3, Mult1, Mult2, Load1, Load2, None };
 
 string fu2str(FU fu) {
     switch (fu) {
-        case Load1:
-            return "Load1";
-        case Load2:
-            return "Load2";
         case Add1:
             return "Add1";
         case Add2:
@@ -35,6 +31,10 @@ string fu2str(FU fu) {
             return "Mult1";
         case Mult2:
             return "Mult2";
+        case Load1:
+            return "Load1";
+        case Load2:
+            return "Load2";
         default:
             return "";
     }
@@ -63,8 +63,6 @@ vector<int> argsort(const vector<T>& v) {
          [&v](int i1, int i2) { return v[i1] < v[i2]; });
     return idx;
 }
-
-// enum RSState { issue, waitExec, exec, execComp, writeResult, unuse };
 
 struct ReservationStations {
     // RSState state;

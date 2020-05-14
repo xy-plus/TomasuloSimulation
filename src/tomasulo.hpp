@@ -20,23 +20,19 @@ const int fuNum = 7;
 const int aNum = 6;
 const int mNum = 3;
 const int lbNum = 3;
-const int amNum = 9;
-const int lbamNum = 12;
-const int lbmNum = 6;
 
 class Tomasulo {
    private:
     vector<string> nel;
     vector<Code> codes;
     vector<pair<int, ReservationStations*>> cdb;
-    // string fu_writeResult[fuNum];
     int clock = 0;
     int current = 0;
     Register regs[32];
     ReservationStations RS[12];
-    ReservationStations* lb = (ReservationStations*)RS;
-    ReservationStations* mrs = lb + 3;
-    ReservationStations* ars = mrs + 3;
+    ReservationStations* ars = (ReservationStations*)RS;
+    ReservationStations* mrs = ars + 6;
+    ReservationStations* lb = mrs + 3;
     vector<CodeState> codeState;
     const TimeCycle time;
     bool done = false;
@@ -46,36 +42,36 @@ class Tomasulo {
     string rs2str(ReservationStations* rs) {
         switch (rs - RS) {
             case 0:
-                return "LB 1";
-            case 1:
-                return "LB 2";
-            case 2:
-                return "LB 3";
-            case 3:
-                return "Mrs 1";
-            case 4:
-                return "Mrs 2";
-            case 5:
-                return "Mrs 3";
-            case 6:
                 return "Ars 1";
-            case 7:
+            case 1:
                 return "Ars 2";
-            case 8:
+            case 2:
                 return "Ars 3";
-            case 9:
+            case 3:
                 return "Ars 4";
-            case 10:
+            case 4:
                 return "Ars 5";
-            case 11:
+            case 5:
                 return "Ars 6";
+            case 6:
+                return "Mrs 1";
+            case 7:
+                return "Mrs 2";
+            case 8:
+                return "Mrs 3";
+            case 9:
+                return "LB 1";
+            case 10:
+                return "LB 2";
+            case 11:
+                return "LB 3";
         }
         return "";
     }
 
     void notify(int regInd, ReservationStations* rs, int imm) {
-        auto amrs = mrs;
-        for (int i = 0; i < amNum; ++i) {
+        auto amrs = ars;
+        for (int i = 0; i < aNum + mNum; ++i) {
             // ars + mrs
             if (amrs[i].Qj == rs || amrs[i].Qk == rs) {
                 if (amrs[i].Qj == rs) {
@@ -164,24 +160,20 @@ class Tomasulo {
     }
 
     void update() {
-        for (int i = 0; i < lbamNum; ++i) {
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
             if (RS[i].fu != FU::None &&
                 (RS[i].op == "LD" ||
                  (RS[i].Qj == nullptr && RS[i].Qk == nullptr))) {
                 if (RS[i].wait) {
-                    // cout << RS[i].line << " " << clock << endl;
-                    // cout << clock << endl;
                     RS[i].wait = false;
                     continue;
                 }
                 if (RS[i].remain > 0) {
                     RS[i].remain -= 1;
                 }
-            } else if (RS[i].fu != FU::None) {
-                // RS[i].wait = false;
             }
         }
-        for (int i = 0; i < lbamNum; ++i) {
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
             if (RS[i].fu != FU::None &&
                 (RS[i].op == "LD" ||
                  (RS[i].Qj == nullptr && RS[i].Qk == nullptr))) {
@@ -231,18 +223,6 @@ class Tomasulo {
     }
 
     void lookup_fu() {
-        // auto lbmrs = lb;
-        // for (int i = 0; i < lbmNum; ++i) {
-        //     if (lbmrs[i].remain > 0 && lbmrs[i].fu == FU::None &&
-        //         (lbmrs[i].op == "LD" ||
-        //          (lbmrs[i].Qj == nullptr && lbmrs[i].Qk == nullptr))) {
-        //         FU fu = get_fu(lbmrs[i].op);
-        //         if (fu != FU::None) {
-        //             assign(&lbmrs[i], fu);
-        //         }
-        //     }
-        // }
-
         vector<ReservationStations*> wait_list;
         vector<pair<int, int>> wait_list_time;
         vector<FU> available_fu;
@@ -415,7 +395,7 @@ class Tomasulo {
             return;
         }
         done = true;
-        for (int i = 0; i < lbamNum; ++i) {
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
             if (RS[i].busy) {
                 done = false;
                 return;
@@ -429,25 +409,11 @@ class Tomasulo {
         }
     }
 
-    // void write_result() {
-    //     for (int i = 0; i < lbamNum; ++i) {
-    //         if (RS[i].state == RSState::writeResult) {
-    //             RS[i].state = RSState::unuse;
-    //             RS[i].busy = false;
-    //             RS[i].remain = -1;
-    //             RS[i].op = "";
-    //         } else if (RS[i].state == RSState::execComp) {
-    //             RS[i].state = RSState::writeResult;
-    //         }
-    //     }
-    // }
-
     void step() {
         if (done)
             return;
         clock += 1;
         clear_cdb();
-        // write_result();
         issue();
         lookup_fu();
         update();
@@ -467,9 +433,8 @@ class Tomasulo {
         done = false;
 
         // rs
-        auto lbms = lb;
-        for (int i = 0; i < lbamNum; ++i) {
-            lbms[i].clear();
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
+            RS[i].clear();
         }
 
         // reg
@@ -604,7 +569,7 @@ class Tomasulo {
     void print_debug() {}
 
     ReservationStations* fu2rs(FU fu) {
-        for (int i = 0; i < lbamNum; ++i) {
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
             if (RS[i].fu == fu) {
                 return &RS[i];
             }
@@ -619,14 +584,8 @@ class Tomasulo {
         for (int i = 0; i < fuNum; ++i) {
             if (fus[i] >= 0) {
                 printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-                       codes[fus[i]].op.c_str(), fu2rs((FU)i)->remain);
-            }
-            //  else if (fu_writeResult[i] != "") {
-            //     printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-            //            fu_writeResult[i].c_str(), 0);
-            //     fu_writeResult[i] = "";
-            // }
-            else {
+                       nel[fus[i]].c_str(), fu2rs((FU)i)->remain);
+            } else {
                 printf("| %s | %s | %s |\n", fu2str((FU)i).c_str(), " ", "");
             }
         }
@@ -636,10 +595,21 @@ class Tomasulo {
     void print_reg() {
         cout << "## 寄存器状态" << endl << endl;
         for (int i = 0; i < 32; ++i) {
+            cout << "| R" << i << " ";
+        }
+        cout << "|" << endl;
+        for (int i = 0; i < 32; ++i) {
+            cout << "| - ";
+        }
+        cout << "|" << endl;
+        for (int i = 0; i < 32; ++i) {
             if (regs[i].rs != nullptr) {
-                cout << "R" << i << ": " << rs2str(regs[i].rs) << endl;
+                cout << "| " << rs2str(regs[i].rs) << " ";
+            } else {
+                cout << "| " << regs[i].val << " ";
             }
         }
+        cout << "|" << endl;
         cout << endl;
     }
 };
