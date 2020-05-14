@@ -25,21 +25,21 @@ class Tomasulo {
    private:
     vector<string> nel;
     vector<Code> codes;
-    vector<pair<int, ReservationStations*>> cdb;
+    vector<pair<int, ReservationStation*>> cdb;
     int clock = 0;
     int current = 0;
     Register regs[32];
-    ReservationStations RS[12];
-    ReservationStations* ars = (ReservationStations*)RS;
-    ReservationStations* mrs = ars + 6;
-    ReservationStations* lb = mrs + 3;
+    ReservationStation RS[12];
+    ReservationStation* ars = (ReservationStation*)RS;
+    ReservationStation* mrs = ars + 6;
+    ReservationStation* lb = mrs + 3;
     vector<CodeState> codeState;
     const TimeCycle time;
     bool done = false;
     int fus[fuNum];
     vector<Log> logs;
 
-    string rs2str(ReservationStations* rs) {
+    string rs2str(ReservationStation* rs) {
         switch (rs - RS) {
             case 0:
                 return "Ars 1";
@@ -69,7 +69,7 @@ class Tomasulo {
         return "";
     }
 
-    void notify(int regInd, ReservationStations* rs, int imm) {
+    void notify(ReservationStation* rs, int imm) {
         auto amrs = ars;
         for (int i = 0; i < aNum + mNum; ++i) {
             // ars + mrs
@@ -91,57 +91,54 @@ class Tomasulo {
         }
     }
 
-    void finish(ReservationStations* rs, int op) {
-        if (op == 0) {
-            fus[rs->fu] = -1;
-            rs->fu = FU::None;
-            return;
-        }
-        if (op == 1) {
-            int line = rs->line;
-            // update reg
-            int regInd = codes[line].reg1;
-            if (rs->op != "JUMP") {
-                int imm = 0;
-                if (rs->op == "LD") {
-                    imm = rs->imm;
-                } else if (rs->op == "ADD") {
-                    imm = rs->Vj + rs->Vk;
-                } else if (rs->op == "SUB") {
-                    imm = rs->Vj - rs->Vk;
-                } else if (rs->op == "MUL") {
-                    imm = rs->Vj * rs->Vk;
-                } else if (rs->op == "DIV") {
-                    if (rs->Vk == 0) {
-                        imm = rs->Vj;
-                    } else {
-                        imm = rs->Vj / rs->Vk;
-                    }
-                }
-                if (regs[regInd].rs == rs) {
-                    regs[regInd].stat = imm;
-                    regs[regInd].rs = nullptr;
-                }
-                if (regs[regInd].update < rs->issue_time) {
-                    regs[regInd].val = imm;
-                    regs[regInd].update = rs->issue_time;
-                }
-                notify(regInd, rs, imm);
-            } else {  // JUMP
-                if (regs[regInd].val == codes[line].imm1) {
-                    current += codes[line].imm2;
+    void finish(ReservationStation* rs) {
+        // release resource
+        fus[rs->fu] = -1;
+        rs->fu = FU::None;
+
+        // update reg
+        int line = rs->line;
+        int regInd = codes[line].reg1;
+        if (rs->op != "JUMP") {
+            int imm = 0;
+            if (rs->op == "LD") {
+                imm = rs->imm;
+            } else if (rs->op == "ADD") {
+                imm = rs->Vj + rs->Vk;
+            } else if (rs->op == "SUB") {
+                imm = rs->Vj - rs->Vk;
+            } else if (rs->op == "MUL") {
+                imm = rs->Vj * rs->Vk;
+            } else if (rs->op == "DIV") {
+                if (rs->Vk == 0) {
+                    imm = rs->Vj;
                 } else {
-                    current += 1;
+                    imm = rs->Vj / rs->Vk;
                 }
             }
-            rs->line = -1;
-            rs->busy = false;
-            rs->wait = true;
-            rs->remain = -1;
-            rs->op = "";
-            rs->Vj = rs->Vk = rs->imm = 0;
-            codeState[line].rs = nullptr;
+            if (regs[regInd].rs == rs) {
+                regs[regInd].stat = imm;
+                regs[regInd].rs = nullptr;
+            }
+            if (regs[regInd].update < rs->issue_time) {
+                regs[regInd].val = imm;
+                regs[regInd].update = rs->issue_time;
+            }
+            notify(rs, imm);
+        } else {  // JUMP
+            if (regs[regInd].val == codes[line].imm1) {
+                current += codes[line].imm2;
+            } else {
+                current += 1;
+            }
         }
+        rs->line = -1;
+        rs->busy = false;
+        rs->wait = true;
+        rs->remain = -1;
+        rs->op = "";
+        rs->Vj = rs->Vk = rs->imm = 0;
+        codeState[line].rs = nullptr;
     }
 
     void clear_cdb() {
@@ -153,8 +150,7 @@ class Tomasulo {
                 logs[info.first].writeResult =
                     codeState[info.first].writeResult;
             }
-            finish(info.second, 0);
-            finish(info.second, 1);
+            finish(info.second);
         }
         cdb.clear();
     }
@@ -180,7 +176,6 @@ class Tomasulo {
                 if (RS[i].remain == 0) {
                     int line = RS[i].line;
                     codeState[line].execComp = clock;
-                    // finish(&RS[i], 0);
                     cdb.push_back(make_pair(line, &RS[i]));
                 }
             }
@@ -216,18 +211,18 @@ class Tomasulo {
         return FU::None;
     }
 
-    void assign(ReservationStations* rs, FU fu) {
+    void assign(ReservationStation* rs, FU fu) {
         rs->fu = fu;
         rs->wait = true;
         fus[fu] = rs->line;
     }
 
     void lookup_fu() {
-        vector<ReservationStations*> wait_list;
+        vector<ReservationStation*> wait_list;
         vector<pair<int, int>> wait_list_time;
         vector<FU> available_fu;
         vector<int> index;
-        ReservationStations* rs = ars;
+        ReservationStation* rs = ars;
         for (int i = 0; i < aNum; ++i) {
             if (rs[i].remain > 0 && rs[i].fu == FU::None &&
                 rs[i].Qj == nullptr && rs[i].Qk == nullptr) {
@@ -296,8 +291,8 @@ class Tomasulo {
         }
     }
 
-    ReservationStations* get_rs(string op) {
-        ReservationStations* rs = nullptr;
+    ReservationStation* get_rs(string op) {
+        ReservationStation* rs = nullptr;
         int len = -1;
         if (op == "LD") {
             rs = lb;
@@ -330,7 +325,7 @@ class Tomasulo {
             codeState[current].rs != nullptr) {  // jump not finish
             return;
         }
-        ReservationStations* rs = get_rs(op);
+        ReservationStation* rs = get_rs(op);
         if (rs == nullptr) {
             return;
         }
@@ -388,6 +383,25 @@ class Tomasulo {
             regs[codes[current].reg1].rs = rs;
             current += 1;  // calc next inst
         }
+    }
+
+    int str2reg(string reg) { return atoi(reg.c_str() + 1); }
+
+    int str2imm(string imm) {
+        stringstream ss;
+        unsigned int x;
+        ss << imm;
+        ss >> hex >> x;
+        return (int)x;
+    }
+
+    ReservationStation* fu2rs(FU fu) {
+        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
+            if (RS[i].fu == fu) {
+                return &RS[i];
+            }
+        }
+        return nullptr;
     }
 
     void check_done() {
@@ -458,16 +472,6 @@ class Tomasulo {
                 step();
             }
         }
-    }
-
-    int str2reg(string reg) { return atoi(reg.c_str() + 1); }
-
-    int str2imm(string imm) {
-        stringstream ss;
-        unsigned int x;
-        ss << imm;
-        ss >> hex >> x;
-        return (int)x;
     }
 
     void set_nel(string data) {
@@ -567,15 +571,6 @@ class Tomasulo {
     }
 
     void print_debug() {}
-
-    ReservationStations* fu2rs(FU fu) {
-        for (int i = 0; i < aNum + mNum + lbNum; ++i) {
-            if (RS[i].fu == fu) {
-                return &RS[i];
-            }
-        }
-        return nullptr;
-    }
 
     void print_fu() {
         cout << "## 运算部件状态" << endl << endl;

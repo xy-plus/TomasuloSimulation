@@ -1,0 +1,510 @@
+\documentclass{article}
+\usepackage{lastpage}
+\usepackage{ragged2e}
+
+\usepackage{amsmath}%提供数学公式支持
+
+\usepackage{graphics}%用于添加图片
+\usepackage{graphicx}%加强插图命令
+\newcommand{\figpath}[1]{contents/fig/#1}
+
+\usepackage{fontspec}%用于配置字体
+\usepackage[table]{xcolor}%用于各种颜色环境
+\usepackage{enumitem}%用于定制list和enum
+\usepackage{float}%用于控制Float环境，添加H参数（强制放在Here）
+\usepackage[colorlinks,linkcolor=airforceblue,urlcolor=blue,anchorcolor=blue,citecolor=green]{hyperref}%用于超链接，另外添加该包目录会自动添加引用。
+
+\usepackage[most]{tcolorbox}%用于添加各种边框支持
+\usepackage[cache=true,outputdir=./out]{minted}%如果不保留临时文件就设置cache=false,如果输出设置了其他目录那么outputdir参数也有手动指定，否则会报错。
+\tcbuselibrary{minted}%加载tcolorbox的代码风格
+
+\usepackage[a4paper,left=3cm,right=3cm,top=3cm,bottom=3cm]{geometry}%用于控制版式
+\usepackage{appendix}%用于控制附加文件
+\usepackage{ifthen}
+
+\usepackage{pdfpages}%用于支持插入其他pdf页
+\usepackage{booktabs}%目前用于给表格添加 \toprule \midrule 等命令
+\usepackage{marginnote} %用于边注
+\usepackage[pagestyles,toctitles]{titlesec} %用于标题格式DIY
+% \usepackage{fancyhdr}%用于排版页眉页脚
+\usepackage{ragged2e} % 用于对齐
+\usepackage{fixltx2e} %用于文本环境的下标
+\usepackage{ulem} %用于好看的下划线、波浪线等修饰
+\usepackage{pifont} %数学符号
+\usepackage{amssymb} %数学符号
+
+\usepackage{fontspec}
+\setmainfont{DejaVu Serif}
+
+
+\definecolor{langback}{RGB}{245,244,250}
+\definecolor{langbacktitle}{RGB}{235,233,245}
+\definecolor{langtitle}{RGB}{177,177,177}
+\definecolor{langno}{RGB}{202,202,202}
+\tcbset{arc=1mm}
+\renewcommand{\theFancyVerbLine}{\sffamily\textcolor{langno}{\scriptsize\oldstylenums{\arabic{FancyVerbLine}}}}%重定义行号的格式
+\newtcblisting{langbox}[1][tex]{%参考自https://reishin.me/tmux/ 的代码框样式
+    arc=1mm,
+    colframe=langbacktitle,
+    colbacktitle=langbacktitle,
+    coltitle=langtitle,
+    fonttitle=\bfseries\sffamily,
+    lefttitle=1mm,toptitle=0.5mm,bottomtitle=0.5mm,
+    title = Code,
+    drop shadow,
+    listing engine=minted,
+    minted style=colorful,
+    minted language=#1,
+    minted options={fontsize=\small,breaklines,autogobble,linenos,numbersep=2mm,xleftmargin=1mm},
+    colback=langback,listing only,
+    bottomrule=0mm,leftrule=0mm,toprule=0mm,rightrule=0mm,
+    enhanced,
+    % overlay={\begin{tcbclipinterior}\fill[langback] (frame.south west)rectangle ([xshift=5mm]frame.north west);\end{tcbclipinterior}}
+}
+
+\definecolor{boxback}{RGB}{245,246,250}
+\newtcolorbox{markquote}{
+    colback=boxback,fonttitle=\sffamily\bfseries,arc=0pt,
+    boxrule=0pt,bottomrule=-1pt,toprule=-1pt,leftrule=-1pt,rightrule=-1pt,
+    drop shadow,enhanced
+}
+
+\usepackage[UTF8,heading=true]{ctex}
+\ctexset{
+	section = {
+	number = 第\chinese{section}节,
+	format = \zihao{3}\bfseries,
+	},
+	subsection = {
+	number = \arabic{section}.\arabic{subsection},
+	format = \Large\bfseries
+	},
+	subsubsection = {
+	number = \arabic{section}.\arabic{subsection}.\arabic{subsubsection},
+	format = \Large\bfseries,
+	},
+    paragraph = {
+	format = \large\bfseries,
+	},
+    subparagraph = {
+	format = \large\bfseries,
+	},
+}
+
+\setlength{\parindent}{2em}%设置首行缩进
+\linespread{1.3}%设置行距
+
+\setlength{\parskip}{0.5em}%设置段间距
+\setcounter{tocdepth}{4}%设置目录级数
+\setcounter{secnumdepth}{3}
+
+
+\newtcbox{\inlang}[1][gray]{on line,
+arc=0pt,outer arc=0pt,colback=#1!10!white,colframe=#1!50!black,
+boxsep=0pt,left=1pt,right=1pt,top=2pt,bottom=2pt,
+boxrule=0pt,bottomrule=-1pt,toprule=-1pt,leftrule=-1pt,rightrule=-1pt}
+
+\newlength\tablewidth
+
+
+\definecolor{tablelinegray}{RGB}{221,221,221}
+\definecolor{tablerowgray}{RGB}{247,247,247}
+\definecolor{tabletopgray}{RGB}{245,246,250}
+\definecolor{airforceblue}{rgb}{0.36, 0.54, 0.66}
+
+\title{Tomasulo Simulation 实验报告}
+\author{刘丰源 2017011313}
+
+\begin{document}
+\normalsize
+\maketitle
+\tableofcontents
+\newpage
+
+
+
+
+
+
+
+
+
+\section{编译运行检察}
+
+
+
+
+./run.sh Example.nel 1
+
+
+第一个参数为文件名；第二个参数选择是否输出中间状态，1 为输出，其它为不输出。
+
+
+结果位于 out.md 文件中，使用 markdown{-}pdf 浏览器打开后可以更美观的格式查看中间状态（效果如下）：
+
+
+\textbf{保留站状态}
+
+
+\begin{center}
+\setlength\tablewidth{\dimexpr (\textwidth -14\tabcolsep)}
+\arrayrulecolor{tablelinegray!75}
+\rowcolors{2}{tablerowgray}{white}
+\begin{tabular}{|p{0.163\tablewidth}<{\centering}|p{0.140\tablewidth}<{\centering}|p{0.140\tablewidth}<{\centering}|p{0.116\tablewidth}<{\centering}|p{0.116\tablewidth}<{\centering}|p{0.163\tablewidth}<{\centering}|p{0.163\tablewidth}<{\centering}|}
+\hline
+\rowcolor{tabletopgray}
+\textbf{ Name  }&\textbf{ Busy }&\textbf{ Op   }&\textbf{ Vj  }&\textbf{ Vk  }&\textbf{ Qj    }&\textbf{ Qk    }\\
+\hline
+ Ars 1 & Yes  & SUB  & 2   & 1   &       &       \\
+\hline
+ Ars 2 & Yes  & JUMP &     &     & Ars 1 &       \\
+\hline
+ Ars 3 & No   &      &     &     &       &       \\
+\hline
+ Ars 4 & No   &      &     &     &       &       \\
+\hline
+ Ars 5 & No   &      &     &     &       &       \\
+\hline
+ Ars 6 & No   &      &     &     &       &       \\
+\hline
+ Mrs 1 & Yes  & DIV  &     &     & LB 3  & Ars 1 \\
+\hline
+ Mrs 2 & No   &      &     &     &       &       \\
+\hline
+ Mrs 3 & No   &      &     &     &       &       \\
+\hline
+\end{tabular}
+\end{center}
+
+
+
+\textbf{Load Buffer 状态}
+
+
+\begin{center}
+\setlength\tablewidth{\dimexpr (\textwidth -6\tabcolsep)}
+\arrayrulecolor{tablelinegray!75}
+\rowcolors{2}{tablerowgray}{white}
+\begin{tabular}{|p{0.353\tablewidth}<{\centering}|p{0.353\tablewidth}<{\centering}|p{0.294\tablewidth}<{\centering}|}
+\hline
+\rowcolor{tabletopgray}
+\textbf{ Name }&\textbf{ Busy }&\textbf{ Imm }\\
+\hline
+ LB 1 & No   &     \\
+\hline
+ LB 2 & No   &     \\
+\hline
+ LB 3 & Yes  & {-}1  \\
+\hline
+\end{tabular}
+\end{center}
+
+
+
+\textbf{寄存器状态}
+
+
+\begin{center}
+\setlength\tablewidth{\dimexpr (\textwidth -16\tabcolsep)}
+\arrayrulecolor{tablelinegray!75}
+\rowcolors{2}{tablerowgray}{white}
+\begin{tabular}{|p{0.111\tablewidth}<{\centering}|p{0.156\tablewidth}<{\centering}|p{0.111\tablewidth}<{\centering}|p{0.133\tablewidth}<{\centering}|p{0.156\tablewidth}<{\centering}|p{0.111\tablewidth}<{\centering}|p{0.111\tablewidth}<{\centering}|p{0.111\tablewidth}<{\centering}|}
+\hline
+\rowcolor{tabletopgray}
+\textbf{ R0  }&\textbf{ R1    }&\textbf{ R2  }&\textbf{ R3   }&\textbf{ R4    }&\textbf{ R5  }&\textbf{ R6  }&\textbf{ R7  }\\
+\hline
+ 0   & Ars 1 & 1   & LB 3 & Mrs 1 & 0   & 0   & 0   \\
+\hline
+\end{tabular}
+\end{center}
+
+
+
+\textbf{运算部件状态}
+
+
+\begin{center}
+\setlength\tablewidth{\dimexpr (\textwidth -6\tabcolsep)}
+\arrayrulecolor{tablelinegray!75}
+\rowcolors{2}{tablerowgray}{white}
+\begin{tabular}{|p{0.333\tablewidth}<{\centering}|p{0.333\tablewidth}<{\centering}|p{0.333\tablewidth}<{\centering}|}
+\hline
+\rowcolor{tabletopgray}
+\textbf{ 部件名称 }&\textbf{ 当前执行指令     }&\textbf{ 当前还剩几个周期 }\\
+\hline
+ Add1     & SUB,R1,R1,R2     & 2                \\
+\hline
+ Add2     &                  &                  \\
+\hline
+ Add3     &                  &                  \\
+\hline
+ Mult1    &                  &                  \\
+\hline
+ Mult2    &                  &                  \\
+\hline
+ Load1    & LD,R3,0xFFFFFFFF & 1                \\
+\hline
+ Load2    &                  &                  \\
+\hline
+\end{tabular}
+\end{center}
+
+
+
+输出结果整理于 Log 目录。
+
+
+\section{设计思路}
+
+
+
+
+\subsection{结构体设计}
+
+
+
+
+代码位于 structs.hpp
+
+
+\begin{itemize}
+\item
+\textbf{Code}
+\end{itemize}
+
+
+
+保存指令的操作符和操作数。
+
+
+\begin{itemize}
+\item
+\textbf{FU}
+\end{itemize}
+
+
+
+功能部件，使用枚举类型。
+
+
+\begin{itemize}
+\item
+\textbf{ReservationStation}
+\end{itemize}
+
+
+
+保留站，保存了忙碌、剩余周期、操作符、操作数、等待的保留站（指针）等信息。
+
+
+\begin{itemize}
+\item
+\textbf{Register}
+\end{itemize}
+
+
+
+寄存器，保存了其数值、更新时间、等待保留站和保留站给出的数值。
+
+
+\begin{itemize}
+\item
+\textbf{CodeState}
+\end{itemize}
+
+
+
+指令状态，保存了发射、执行结束、写回时间，以及使用的保留站。
+
+
+\begin{itemize}
+\item
+\textbf{Log}
+\end{itemize}
+
+
+
+类似 CodeState ，但是只保留第一次执行的信息。
+
+
+\subsection{接口设计}
+
+
+
+
+核心代码位于 tomasulo.hpp ，主要提供以下功能：
+
+
+\begin{enumerate}
+\item
+set\_nel(string s)：设置程序代码。
+\item
+run(int n)：模拟运行 n 个周期。
+\item
+print\_clock/amrs/lb/reg/fu()：输出当前周期的保留站、寄存器、功能部件等信息。
+\end{enumerate}
+
+
+
+\subsection{算法设计}
+
+
+
+
+核心函数为 step() ，每次执行为一个时钟周期，依次执行以下函数：
+
+
+\begin{enumerate}
+\item
+clear\_cdb：将所有执行结束的指令占用的保留站、功能部件释放，并且通知正在等待该保留站的保留站准备执行。如果指令为 JUMP ，则更新当前执行指令的位置。
+\item
+issue：检察当前指令是否能够发射，如果为 JUMP 并且正在执行，则进行等待，否则按顺序执行。
+\item
+lookup\_fu：检察保留站中是否有指令可以就绪，若可以，则分配功能部件。
+\item
+update：将保留站中正在执行的指令的剩余时钟周期减一；如果执行完成，则将其信息写入 cdb ，等待资源回收。
+\end{enumerate}
+
+
+
+将 clear\_cdb 放于最前面是因为，指令在 writeResult 状态的时候，其它用到该指令占用资源、或在等待该指令结果的指令，是可以就绪的，所以将释放资源放在最前面。
+
+
+指令在刚就绪的时候不能执行，需要再额外等待一个周期，所以给保留站设置了 wait 变量。
+
+
+\section{拓展功能}
+
+
+
+
+\subsection{JUMP 指令}
+
+
+
+
+\begin{enumerate}
+\item
+指令执行结束后，如果该指令为 JUMP ，则更新当前执行指令的位置（加一或跳转）。
+\item
+功能部件和保留站的分配与 ADD 相同，但是执行时间不同。
+\item
+指令发射时，需要判断当前指令是否是 JUMP 。如果是，且尚未执行完毕，则跳过发射，进行等待。
+\item
+指令发射成功后，如果发射指令是 JUMP ，则不更新当前执行指令的位置，否则按顺序加一。
+\end{enumerate}
+
+
+
+\subsection{性能优化}
+
+
+
+
+\subsubsection{测试方式}
+
+
+
+
+\begin{enumerate}
+\item
+修改 src/main.cpp ，将其中的 \inlang{\small{cout << "time: " << microtime() {-} start << "s" << endl}} 取消注释。
+\item
+./run.sh Big\_test.nel 0 。第二个参数一定要是 0 ，关闭输出中间状态，否则会浪费大量时间在 IO 上。
+\end{enumerate}
+
+
+
+\subsubsection{测试结果}
+
+
+
+
+\begin{itemize}
+\item
+Big\_test：8.9 秒。
+\item
+Mul：0.014 秒。
+\end{itemize}
+
+
+
+\subsubsection{优化方案}
+
+
+
+
+\begin{enumerate}
+\item
+传递指针，不使用拷贝构造，性能提高。保留站及其内部的数据需要被多个函数使用，为了保证数据的一致性，并且提高数据传递的性能，全部使用指针传递。
+\item
+将字符串比较变为整数比较。创建 enum FU ，对 fu 进行比较、判断时，原本需要使用字符串比较，改进后变为整数比较。原本查找某个部件的信息需要进行遍历，复杂度为  $O(n * len(m))$  ；改进后可以通过 fus{[}(int)fu{]} 直接访问，复杂度为  $O(1)$  。
+\item
+为 ars、mrs、lb 开辟连续的内存，使得遍历更加便捷、快速。
+\end{enumerate}
+
+
+
+\section{记分牌与 Tomasulo 比较}
+
+
+
+
+\subsection{记分牌}
+
+
+
+
+\begin{enumerate}
+\item
+逻辑电路仅相当于一个功能部件，结构简单，耗费低，但是指令流出慢。
+\item
+并行性取决于程序，如果程序中的指令均与前面相关，则性能不升反降。
+\item
+容量决定能在多大范围内寻找不相关指令，也称指令窗口。
+\item
+功能部件的总数决定了结构冲突的严重程度，采用动态调度后结构重读会更加频繁。
+\item
+乱序执行会产生更多的名相关，导致写后写、先读后写阻塞增多。
+\end{enumerate}
+
+
+
+\subsection{Tomasulo}
+
+
+
+
+\begin{enumerate}
+\item
+将记分牌的关键部分和寄存器换名技术结合，通过保留站实现换名。
+\item
+只要操作数有效，就将指令取到保留站中，避免指令流出时才到寄存器中取数据。即将执行的指令从相应的保留站中取得操作数，而不是从寄存器中取。
+\item
+一条指令流出时，存放操作数的操作数的寄存器名被换成对应于该寄存器保留站的名称（编号）。
+\item
+冲突检测和指令执行控制机制分开。一个功能部件的指令何时开始执行，有该功能部件的保留站控制，而记分牌则是集中控制。
+\item
+计算的结果通过相关专用通路直接从功能部件进入对应的保留站中进行缓冲，而不一定是写到寄存器。这个相关专用通路通过公共数据总线来实现（Common Data Bus, CDB）。所有等待这个结果的功能部件（指令）可以同时读取。与之相比，记分牌将结果首先写到寄存器，等待此结果的功能部件要通过竞争，在记分牌的控制下使用。
+\item
+具有分布的阻塞检测机制。
+\item
+消除了数据的写后写和先读后写相关导致的阻塞。
+\end{enumerate}
+
+
+
+\section{实验总结}
+
+
+
+
+\begin{enumerate}
+\item
+理论与实践结合，加深了对 tomasulo 算法的理解。
+\item
+对 tomasulo 算法的细节有了更详细的了解，回顾了 cpu 运行的时序问题。
+\item
+通过这次实验，我收获良多，感谢老师和助教给我这次学习和锻炼的机会。
+\end{enumerate}
+\end{document}

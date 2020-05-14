@@ -64,23 +64,21 @@ vector<int> argsort(const vector<T>& v) {
     return idx;
 }
 
-struct ReservationStations {
-    // RSState state;
+struct ReservationStation {
     bool busy;
     int remain;
     FU fu;
     string op;
     int Vj, Vk;
     int imm;
-    ReservationStations* Qj;
-    ReservationStations* Qk;
+    ReservationStation* Qj;
+    ReservationStation* Qk;
     int issue_time;
     int line;
     bool wait;
     int ready_time;
 
     void clear() {
-        // state = RSState::unuse;s
         busy = false;
         remain = -1;
         fu = FU::None;
@@ -92,11 +90,11 @@ struct ReservationStations {
         wait = false;
     }
 
-    ReservationStations() { clear(); }
+    ReservationStation() { clear(); }
 };
 
 struct Register {
-    ReservationStations* rs;
+    ReservationStation* rs;
     int val, stat, update;
 
     void clear() {
@@ -109,7 +107,7 @@ struct Register {
 
 struct CodeState {
     int issue, execComp, writeResult;
-    ReservationStations* rs;
+    ReservationStation* rs;
 
     void clear() {
         issue = execComp = writeResult = -1;
