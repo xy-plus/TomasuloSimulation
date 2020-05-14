@@ -18,6 +18,8 @@ struct TimeCycle {
 
 const int fuNum = 7;
 const int aNum = 6;
+const int mNum = 3;
+const int lbNum = 3;
 const int amNum = 9;
 const int lbamNum = 12;
 const int lbmNum = 6;
@@ -88,6 +90,7 @@ class Tomasulo {
                     amrs[i].Qk == nullptr) {
                     amrs[i].remain = 1;  // DIV 0
                 }
+                amrs[i].ready_time = clock;
             }
         }
     }
@@ -123,9 +126,9 @@ class Tomasulo {
                     regs[regInd].stat = imm;
                     regs[regInd].rs = nullptr;
                 }
-                if (regs[regInd].update < rs->time) {
+                if (regs[regInd].update < rs->issue_time) {
                     regs[regInd].val = imm;
-                    regs[regInd].update = rs->time;
+                    regs[regInd].update = rs->issue_time;
                 }
                 notify(regInd, rs, imm);
             } else {  // JUMP
@@ -137,6 +140,7 @@ class Tomasulo {
             }
             rs->line = -1;
             rs->busy = false;
+            rs->wait = true;
             rs->remain = -1;
             rs->op = "";
             rs->Vj = rs->Vk = rs->imm = 0;
@@ -153,6 +157,7 @@ class Tomasulo {
                 logs[info.first].writeResult =
                     codeState[info.first].writeResult;
             }
+            finish(info.second, 0);
             finish(info.second, 1);
         }
         cdb.clear();
@@ -163,9 +168,17 @@ class Tomasulo {
             if (RS[i].fu != FU::None &&
                 (RS[i].op == "LD" ||
                  (RS[i].Qj == nullptr && RS[i].Qk == nullptr))) {
+                if (RS[i].wait) {
+                    // cout << RS[i].line << " " << clock << endl;
+                    // cout << clock << endl;
+                    RS[i].wait = false;
+                    continue;
+                }
                 if (RS[i].remain > 0) {
                     RS[i].remain -= 1;
                 }
+            } else if (RS[i].fu != FU::None) {
+                // RS[i].wait = false;
             }
         }
         for (int i = 0; i < lbamNum; ++i) {
@@ -175,7 +188,7 @@ class Tomasulo {
                 if (RS[i].remain == 0) {
                     int line = RS[i].line;
                     codeState[line].execComp = clock;
-                    finish(&RS[i], 0);
+                    // finish(&RS[i], 0);
                     cdb.push_back(make_pair(line, &RS[i]));
                 }
             }
@@ -213,32 +226,37 @@ class Tomasulo {
 
     void assign(ReservationStations* rs, FU fu) {
         rs->fu = fu;
+        rs->wait = true;
         fus[fu] = rs->line;
     }
 
     void lookup_fu() {
-        auto lbmrs = lb;
-        for (int i = 0; i < lbmNum; ++i) {
-            if (lbmrs[i].remain > 0 && lbmrs[i].fu == FU::None &&
-                (lbmrs[i].op == "LD" ||
-                 (lbmrs[i].Qj == nullptr && lbmrs[i].Qk == nullptr))) {
-                FU fu = get_fu(lbmrs[i].op);
-                if (fu != FU::None) {
-                    assign(&lbmrs[i], fu);
-                }
-            }
-        }
-        vector<ReservationStations*> ars_wait_list;
-        vector<int> ars_wait_list_time;
-        for (int i = 0; i < aNum; ++i) {
-            if (ars[i].remain > 0 && ars[i].fu == FU::None &&
-                ars[i].Qj == nullptr && ars[i].Qk == nullptr) {
-                ars_wait_list.push_back(&ars[i]);
-                ars_wait_list_time.push_back(ars[i].time);
-            }
-        }
-        vector<int> index = argsort(ars_wait_list_time);
+        // auto lbmrs = lb;
+        // for (int i = 0; i < lbmNum; ++i) {
+        //     if (lbmrs[i].remain > 0 && lbmrs[i].fu == FU::None &&
+        //         (lbmrs[i].op == "LD" ||
+        //          (lbmrs[i].Qj == nullptr && lbmrs[i].Qk == nullptr))) {
+        //         FU fu = get_fu(lbmrs[i].op);
+        //         if (fu != FU::None) {
+        //             assign(&lbmrs[i], fu);
+        //         }
+        //     }
+        // }
+
+        vector<ReservationStations*> wait_list;
+        vector<pair<int, int>> wait_list_time;
         vector<FU> available_fu;
+        vector<int> index;
+        ReservationStations* rs = ars;
+        for (int i = 0; i < aNum; ++i) {
+            if (rs[i].remain > 0 && rs[i].fu == FU::None &&
+                rs[i].Qj == nullptr && rs[i].Qk == nullptr) {
+                wait_list.push_back(&rs[i]);
+                wait_list_time.push_back(
+                    make_pair(rs[i].ready_time, rs[i].issue_time));
+            }
+        }
+        index = argsort(wait_list_time);
         for (int i = FU::Add1; i <= FU::Add3; ++i) {
             if (fus[i] == -1) {
                 available_fu.push_back((FU)i);
@@ -246,7 +264,55 @@ class Tomasulo {
         }
         int n = min(available_fu.size(), index.size());
         for (int i = 0; i < n; ++i) {
-            assign(ars_wait_list[index[i]], available_fu[i]);
+            assign(wait_list[index[i]], available_fu[i]);
+        }
+
+        wait_list.clear();
+        wait_list_time.clear();
+        available_fu.clear();
+        index.clear();
+        rs = mrs;
+        for (int i = 0; i < mNum; ++i) {
+            if (rs[i].remain > 0 && rs[i].fu == FU::None &&
+                rs[i].Qj == nullptr && rs[i].Qk == nullptr) {
+                wait_list.push_back(&rs[i]);
+                wait_list_time.push_back(
+                    make_pair(rs[i].ready_time, rs[i].issue_time));
+            }
+        }
+        index = argsort(wait_list_time);
+        for (int i = FU::Mult1; i <= FU::Mult2; ++i) {
+            if (fus[i] == -1) {
+                available_fu.push_back((FU)i);
+            }
+        }
+        n = min(available_fu.size(), index.size());
+        for (int i = 0; i < n; ++i) {
+            assign(wait_list[index[i]], available_fu[i]);
+        }
+
+        wait_list.clear();
+        wait_list_time.clear();
+        available_fu.clear();
+        index.clear();
+        rs = lb;
+        for (int i = 0; i < lbNum; ++i) {
+            if (rs[i].remain > 0 && rs[i].fu == FU::None &&
+                rs[i].Qj == nullptr && rs[i].Qk == nullptr) {
+                wait_list.push_back(&rs[i]);
+                wait_list_time.push_back(
+                    make_pair(rs[i].ready_time, rs[i].issue_time));
+            }
+        }
+        index = argsort(wait_list_time);
+        for (int i = FU::Load1; i <= FU::Load2; ++i) {
+            if (fus[i] == -1) {
+                available_fu.push_back((FU)i);
+            }
+        }
+        n = min(available_fu.size(), index.size());
+        for (int i = 0; i < n; ++i) {
+            assign(wait_list[index[i]], available_fu[i]);
         }
     }
 
@@ -297,7 +363,7 @@ class Tomasulo {
 
         // reset rs status
         rs->busy = true;
-        rs->time = clock;
+        rs->issue_time = rs->ready_time = clock;
         rs->op = op;
         rs->line = current;
         if (op == "LD") {
@@ -336,12 +402,6 @@ class Tomasulo {
                     rs->Qk = nullptr;
                 }
             }
-        }
-
-        FU fu = get_fu(op);
-        if (fu != FU::None &&
-            (op == "LD" || (rs->Qj == nullptr && rs->Qk == nullptr))) {
-            assign(rs, fu);
         }
 
         if (op != "JUMP") {
@@ -388,9 +448,9 @@ class Tomasulo {
         clock += 1;
         clear_cdb();
         // write_result();
-        update();
-        lookup_fu();
         issue();
+        lookup_fu();
+        update();
         check_done();
     }
 
@@ -552,25 +612,26 @@ class Tomasulo {
         return nullptr;
     }
 
-    // void print_fu() {
-    //     cout << "## 运算部件状态" << endl << endl;
-    //     cout << "| 部件名称 | 当前执行指令 | 当前还剩几个周期 |" << endl;
-    //     cout << "| - | - | - |" << endl;
-    //     for (int i = 0; i < fuNum; ++i) {
-    //         if (fus[i] >= 0) {
-    //             printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-    //                    codes[fus[i]].op.c_str(), fu2rs((FU)i)->remain);
-    //         } else if (fu_writeResult[i] != "") {
-    //             printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
-    //                    fu_writeResult[i].c_str(), 0);
-    //             fu_writeResult[i] = "";
-    //         } else {
-    //             printf("| %s | %s | %s |\n", fu2str((FU)i).c_str(), " ", "
-    //             ");
-    //         }
-    //     }
-    //     cout << endl;
-    // }
+    void print_fu() {
+        cout << "## 运算部件状态" << endl << endl;
+        cout << "| 部件名称 | 当前执行指令 | 当前还剩几个周期 |" << endl;
+        cout << "| - | - | - |" << endl;
+        for (int i = 0; i < fuNum; ++i) {
+            if (fus[i] >= 0) {
+                printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
+                       codes[fus[i]].op.c_str(), fu2rs((FU)i)->remain);
+            }
+            //  else if (fu_writeResult[i] != "") {
+            //     printf("| %s | %s | %d |\n", fu2str((FU)i).c_str(),
+            //            fu_writeResult[i].c_str(), 0);
+            //     fu_writeResult[i] = "";
+            // }
+            else {
+                printf("| %s | %s | %s |\n", fu2str((FU)i).c_str(), " ", "");
+            }
+        }
+        cout << endl;
+    }
 
     void print_reg() {
         cout << "## 寄存器状态" << endl << endl;

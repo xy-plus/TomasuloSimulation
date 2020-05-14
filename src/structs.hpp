@@ -59,8 +59,8 @@ vector<int> argsort(const vector<T>& v) {
     for (int i = 0; i < Len; ++i) {
         idx[i] = i;
     }
-    std::sort(idx.begin(), idx.end(),
-              [&v](int i1, int i2) { return v[i1] < v[i2]; });
+    sort(idx.begin(), idx.end(),
+         [&v](int i1, int i2) { return v[i1] < v[i2]; });
     return idx;
 }
 
@@ -76,8 +76,10 @@ struct ReservationStations {
     int imm;
     ReservationStations* Qj;
     ReservationStations* Qk;
-    int time;
+    int issue_time;
     int line;
+    bool wait;
+    int ready_time;
 
     void clear() {
         // state = RSState::unuse;s
@@ -87,8 +89,9 @@ struct ReservationStations {
         op = "";
         Vj = Vk = imm = 0;
         Qj = Qk = nullptr;
-        time = 0;
+        issue_time = ready_time = 0;
         line = -1;
+        wait = false;
     }
 
     ReservationStations() { clear(); }
